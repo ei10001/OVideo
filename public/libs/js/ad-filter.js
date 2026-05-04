@@ -123,20 +123,68 @@
             video.removeAttribute('srcObject');
 
             var CustomHlsJsLoader = createCustomLoader(Hls);
-            var hls = new Hls({
+
+            var hlsConfig = {
                 debug: false,
                 enableWorker: true,
-                loader: CustomHlsJsLoader
-            });
+                loader: CustomHlsJsLoader,
+                manifestLoadingMaxRetry: 2,
+                manifestLoadingRetryDelay: 500,
+                levelLoadingMaxRetry: 2,
+                levelLoadingRetryDelay: 500,
+                fragLoadingMaxRetry: 2,
+                fragLoadingRetryDelay: 500,
+                fragLoadingLoopThreshold: 3,
+                maxBufferSize: 0,
+                maxBufferLength: 30,
+                startLevel: 0
+            };
+
+            var hls = new Hls(hlsConfig);
+
+            var recoverAttempts = 0;
+            var maxRecoverAttempts = 2;
 
             hls.on(Hls.Events.MANIFEST_PARSED, function () {
                 log('HLS Manifest 解析完成');
+                recoverAttempts = 0;
                 video.play().catch(function () { });
             });
 
             hls.on(Hls.Events.ERROR, function (event, data) {
                 if (data.fatal) {
-                    log('HLS 错误:', data.type, data.details);
+                    switch (data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            log('网络错误，尝试恢复...', data.details);
+                            if (recoverAttempts < maxRecoverAttempts) {
+                                recoverAttempts++;
+                                hls.startLoad();
+                            } else {
+                                log('网络错误，尝试切换播放器');
+                                hls.destroy();
+                                video.src = url;
+                                video.play().catch(function () { });
+                            }
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            log('媒体错误，尝试恢复...', data.details);
+                            if (recoverAttempts < maxRecoverAttempts) {
+                                recoverAttempts++;
+                                hls.recoverMediaError();
+                            } else {
+                                log('媒体错误，尝试切换播放器');
+                                hls.destroy();
+                                video.src = url;
+                                video.play().catch(function () { });
+                            }
+                            break;
+                        default:
+                            log('HLS 错误:', data.type, data.details);
+                            hls.destroy();
+                            video.src = url;
+                            video.play().catch(function () { });
+                            break;
+                    }
                 }
             });
 
