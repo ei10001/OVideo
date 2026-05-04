@@ -19,6 +19,9 @@ on:
         required: true
         default: 'v1.0.0'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -261,40 +264,21 @@ jobs:
           path: android/app/build/outputs/apk/release/*.apk
           retention-days: 30
 
+      - name: Create Git Tag
+        if: steps.version.outputs.VERSION != ''
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -f "${{ steps.version.outputs.VERSION }}"
+          git push origin "${{ steps.version.outputs.VERSION }}" --force
+
       - name: Create GitHub Release
         if: steps.version.outputs.VERSION != ''
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.version.outputs.VERSION }}
-          name: "E视界 ${{ steps.version.outputs.VERSION }}"
-          body: |
-            ## 📦 E视界 ${{ steps.version.outputs.VERSION }}
-            
-            ### 📱 Android APK 下载
-            
-            | 文件 | 说明 |
-            |------|------|
-            | `E视界-${{ steps.version.outputs.VERSION }}-universal.apk` | 通用版 (支持所有设备) |
-            
-            ### 🖥️ 支持的 CPU 架构
-            - ✅ `armeabi-v7a` (ARM 32位 - 旧手机/盒子)
-            - ✅ `arm64-v8a` (ARM 64位 - 大多数现代手机/盒子)
-            - ✅ `x86` (Intel/AMD 32位 - 模拟器)
-            - ✅ `x86_64` (Intel/AMD 64位 - 模拟器/部分平板)
-            
-            ### 📺 设备兼容性
-            - ✅ 手机 (Android 5.0+)
-            - ✅ 平板
-            - 📺 电视/盒子: 推荐使用电视浏览器访问网页版，兼容性更佳
-            
-            ### 🌐 内置服务器
-            - 默认连接: `${{ github.event.inputs.server_url || 'https://kubo.us.ci/' }}`
-            
-            ---
-            
-            > ⚠️ 首次安装可能需要允许"安装未知来源应用"
-          files: android/app/build/outputs/apk/release/*.apk
-          draft: false
-          prerelease: false
+        run: |
+          gh release create "${{ steps.version.outputs.VERSION }}" \
+            --title "E视界 ${{ steps.version.outputs.VERSION }}" \
+            --notes "## 📱 E视界 ${{ steps.version.outputs.VERSION }}
+          APK 文件已附在下方，可以直接下载安装。" \
+            android/app/build/outputs/apk/release/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
