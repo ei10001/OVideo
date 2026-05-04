@@ -1,0 +1,17 @@
+{
+    "appId": "com.ednovas.donguatv",
+    "appName": "E视界",
+    "webDir": "public",
+    "server": {
+        "url": "https://kubo.us.ci/",
+        "cleartext": true
+    },
+    "plugins": {
+        "StatusBar": {
+            "overlaysWebView": false,
+            "style": "DARK",
+            "backgroundColor": "#141414"
+        },
+        "ScreenOrientation": {}
+    }
+}

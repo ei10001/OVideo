@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>清除缓存 - E视界</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+
+        .container {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            max-width: 500px;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p {
+            color: #aaa;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .status {
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 14px;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .status .success {
+            color: #46d369;
+        }
+
+        .status .info {
+            color: #60a5fa;
+        }
+
+        .status .error {
+            color: #ef4444;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #e50914 0%, #b20710 100%);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(229, 9, 20, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+            margin-top: 15px;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🧹 清除网站缓存</h1>
+        <p>如果网站显示异常或版本过旧，点击下方按钮清除所有缓存数据。清除后将自动跳转到主页。</p>
+
+        <div class="status" id="status">
+            <div class="info">等待操作...</div>
+        </div>
+
+        <button class="btn" id="clearBtn" onclick="clearAllCache()">
+            🗑️ 清除所有缓存
+        </button>
+
+        <br>
+
+        <a href="/" class="btn btn-secondary">↩️ 返回主页</a>
+    </div>
+
+    <script>
+        function log(msg, type) {
+            var status = document.getElementById('status');
+            var div = document.createElement('div');
+            div.className = type || 'info';
+            div.textContent = '> ' + msg;
+            status.appendChild(div);
+            status.scrollTop = status.scrollHeight;
+        }
+
+        async function clearAllCache() {
+            var btn = document.getElementById('clearBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>正在清除...';
+
+            document.getElementById('status').innerHTML = '';
+
+            try {
+                // 1. 注销所有 Service Worker
+                log('正在注销 Service Worker...', 'info');
+                if ('serviceWorker' in navigator) {
+                    var registrations = await navigator.serviceWorker.getRegistrations();
+                    for (var reg of registrations) {
+                        await reg.unregister();
+                        log('已注销: ' + reg.scope, 'success');
+                    }
+                    if (registrations.length === 0) {
+                        log('没有找到 Service Worker', 'info');
+                    }
+                }
+
+                // 2. 删除所有缓存
+                log('正在删除缓存存储...', 'info');
+                if ('caches' in window) {
+                    var cacheNames = await caches.keys();
+                    for (var name of cacheNames) {
+                        await caches.delete(name);
+                        log('已删除缓存: ' + name, 'success');
+                    }
+                    if (cacheNames.length === 0) {
+                        log('没有找到缓存', 'info');
+                    }
+                }
+
+                // 3. 清除 localStorage
+                log('正在清除本地存储...', 'info');
+                var swKeys = Object.keys(localStorage).filter(function (k) {
+                    return k.startsWith('sw_');
+                });
+                swKeys.forEach(function (k) { localStorage.removeItem(k); });
+                log('已清除 ' + swKeys.length + ' 项 SW 相关存储', 'success');
+
+                // 4. 完成
+                log('✅ 所有缓存已清除！', 'success');
+                log('3 秒后跳转到主页...', 'info');
+
+                btn.innerHTML = '✅ 清除完成';
+
+                setTimeout(function () {
+                    window.location.href = '/?v=' + Date.now();
+                }, 3000);
+
+            } catch (e) {
+                log('❌ 错误: ' + e.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '🗑️ 重试';
+            }
+        }
+
+        // 页面加载时显示当前状态
+        (async function () {
+            if ('serviceWorker' in navigator) {
+                var regs = await navigator.serviceWorker.getRegistrations();
+                log('当前 Service Worker 数量: ' + regs.length, 'info');
+            }
+            if ('caches' in window) {
+                var names = await caches.keys();
+                log('当前缓存数量: ' + names.length, 'info');
+                names.forEach(function (n) { log('  - ' + n, 'info'); });
+            }
+        })();
+    </script>
+</body>
+
+</html>
